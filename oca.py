@@ -32,10 +32,10 @@
 
 # the test object(s)
 #record_id = "PPN1026788544" # about 50 pages, good ocr, low confidence
-record_id = "PPN86268370X" # about 150 pages, good ocr, high confidence
+#record_id = "PPN86268370X" # about 150 pages, good ocr, high confidence
 #record_id = "PPN1041860838" # about 350 pages, bad ocr -> wrong script, low confidence
 #record_id = "PPN1672846668" # about 100 pages, bad ocr -> wrong script, extreme high confidences, visible anomaly
-
+record_id = '1885328680'
 
 # ## Importing libraries
 # 
@@ -108,13 +108,12 @@ def download_if_not_exists(filename, url):
 
 
 # path to METS directory
-mets_dir = record_id + "/mets/" 
+mets_dir = record_id + '/'
 
 # download the METS/MODS
-mets_url = "https://mets.sub.uni-hamburg.de/kitodo/" + str(record_id)
 mets_filename = mets_dir + record_id + ".xml"
+mets_url = 'https://digi.bib.uni-mannheim.de/fileadmin/digi/' + mets_filename
 download_if_not_exists(mets_filename, mets_url)
-
 
 # ### ... extract the fulltext URLs
 # 
@@ -173,6 +172,7 @@ for alto_url in fulltext_path:
     # read the ALTO file
     alto=[]
     alto_filename = alto_dir + os.path.basename(alto_url)
+    print('Read ALTO file ' + alto_filename)
     with open(alto_filename, 'r', encoding='utf-8') as file:
         alto = file.read()
     
@@ -181,6 +181,8 @@ for alto_url in fulltext_path:
     
     # extract all textlines
     textlines = alto_soup.find_all('TextLine')
+    print('textlines ')
+    print(textlines)
     
     # create sublist for textlines
     textlines_wc = []
@@ -201,7 +203,8 @@ for alto_url in fulltext_path:
         textlines_wc.append(string_wc)
     
     # add textline to pages list
-    pages_wc.append(textlines_wc)
+    if textlines_wc:
+        pages_wc.append(textlines_wc)
 
 
 # ### ... create a list of DataFrames for all pages
@@ -210,6 +213,9 @@ for alto_url in fulltext_path:
 
 # In[ ]:
 
+
+print('pages_wc')
+print(pages_wc)
 
 # create list of DataFrames
 pages_df_list = [pd.DataFrame(item) for item in pages_wc]
@@ -454,7 +460,7 @@ with Image.open(images_dir + record_id + '.png') as img:
 
 
 # simply stack all word confidencies into one single column and clean up
-confidence_df = pd.concat(pages_df_list, axis=0).stack()
+confidence_df = pd.concat(pages_df_list, axis=0, sort=True).stack()
 confidence_df = confidence_df.reset_index(name='Confidence')
 confidence_df.drop('level_0', axis=1, inplace=True)
 confidence_df.drop('level_1', axis=1, inplace=True)
