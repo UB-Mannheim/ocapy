@@ -172,7 +172,6 @@ for alto_url in fulltext_path:
     # read the ALTO file
     alto=[]
     alto_filename = alto_dir + os.path.basename(alto_url)
-    print('Read ALTO file ' + alto_filename)
     with open(alto_filename, 'r', encoding='utf-8') as file:
         alto = file.read()
     
@@ -181,30 +180,33 @@ for alto_url in fulltext_path:
     
     # extract all textlines
     textlines = alto_soup.find_all('TextLine')
-    print('textlines ')
-    print(textlines)
+    if textlines:
+        print('INFO: textlines in ' + alto_filename)
+        print(textlines)
     
-    # create sublist for textlines
-    textlines_wc = []
+        # create sublist for textlines
+        textlines_wc = []
     
-    # loop through all textlines
-    for item in textlines:
-        # extract al strings
-        strings = item.find_all('String')
+        # loop through all textlines
+        for item in textlines:
+            # extract al strings
+            strings = item.find_all('String')
         
-        # create sublist for strings
-        string_wc = []
+            # create sublist for strings
+            string_wc = []
         
-        # loop through all strings
-        for item in strings:
-            # extract word confidencies for the strings
-            string_wc.append(item['WC'])
-        # add string to textline sublist
-        textlines_wc.append(string_wc)
+            # loop through all strings
+            for item in strings:
+                # extract word confidencies for the strings
+                string_wc.append(item['WC'])
+            # add string to textline sublist
+            textlines_wc.append(string_wc)
     
-    # add textline to pages list
-    if textlines_wc:
-        pages_wc.append(textlines_wc)
+        # add textline to pages list
+        if textlines_wc:
+            pages_wc.append(textlines_wc)
+    else:
+        print('INFO: no textlines in ' + alto_filename)
 
 
 # ### ... create a list of DataFrames for all pages
@@ -214,7 +216,7 @@ for alto_url in fulltext_path:
 # In[ ]:
 
 
-print('pages_wc')
+print('INFO: pages_wc')
 print(pages_wc)
 
 # create list of DataFrames
@@ -531,10 +533,26 @@ for counter in range(len(fulltext_path)):
     # add new row each 6 cards
     if counter % 6 == 0:
         report_details += '<div class="row gx-2 m-1"></div><div class="row gx-2 m-1">'
-    
+
+    print(f'{counter=}')
+    print(f'{pages_df_list_report_df["count"]=}')
+    print(f'{pages_df_list_report_df["count"].iloc[counter]}')
+    print(f'{pages_df_list_report_df["count"].iloc=}')
+
     # add card to row
     # each card is a detailed statistic for each page with the heatmap of each page
-    report_details += '    <div class="col-lg-2 col-md-12 h-100">    <div class="card border-dark">    <a href="alto/' + str(counter + 1).zfill(8) + '.xml"><img src="images/' + str(counter) + '.png" class="card-img-top" alt="Page ' + str(counter + 1) + '"></a>    <div class="card-body">    <h5 class="card-title"><a href="https://pic.sub.uni-hamburg.de/kitodo/' + record_id + '/' + str(counter + 1).zfill(8) + '.tif" class="link-dark">Page ' + str(counter + 1) + '</a></h5>    <h6 class="card-subtitle mb-2 text-muted">Page Stats</h6>    <p class="font-monospace">    Words: ' + str(int(pages_df_list_report_df['count'].iloc[counter])) + '<br>    Lines: ' + str(len(pages_df_list[counter])) + '<br>    </p>    <h6 class="card-subtitle mb-2 text-muted">Word Confidence</h6>    <p class="font-monospace">    mean:&nbsp;' + str(pages_df_list_report_df['mean'].iloc[counter])[0:4] + '<br>    std:&nbsp;&nbsp;' + str(pages_df_list_report_df['std'].iloc[counter])[0:4] + '<br>    <br>    <!--min:&nbsp;&nbsp;' + str(pages_df_list_report_df['min'].iloc[counter])[0:4] + '<br>-->    25%:&nbsp;&nbsp;' + str(pages_df_list_report_df['25%'].iloc[counter])[0:4] + '<br>    50%:&nbsp;&nbsp;' + str(pages_df_list_report_df['50%'].iloc[counter])[0:4] + '<br>    75%:&nbsp;&nbsp;' + str(pages_df_list_report_df['75%'].iloc[counter])[0:4] + '<br>    <!--max:&nbsp;&nbsp;' + str(pages_df_list_report_df['max'].iloc[counter])[0:4] + '-->    </p>    </div>    </div>    </div>'
+    report_details += '    <div class="col-lg-2 col-md-12 h-100">'
+    report_details += '    <div class="card border-dark">'
+    report_details += '    <a href="alto/' + str(counter + 1).zfill(8) + '.xml"><img src="images/' + str(counter) + '.png" class="card-img-top" alt="Page ' + str(counter + 1) + '"></a>'
+    report_details += '    <div class="card-body">'
+    report_details += '    <h5 class="card-title"><a href="https://pic.sub.uni-hamburg.de/kitodo/' + record_id + '/' + str(counter + 1).zfill(8) + '.tif" class="link-dark">Page ' + str(counter + 1) + '</a></h5>'
+    report_details += '    <h6 class="card-subtitle mb-2 text-muted">Page Stats</h6>'
+    report_details += '    <p class="font-monospace">    Words: ' + str(int(pages_df_list_report_df['count'].iloc[counter])) + '<br>    Lines: ' + str(len(pages_df_list[counter])) + '<br>    </p>'
+    report_details += '    <h6 class="card-subtitle mb-2 text-muted">Word Confidence</h6>'
+    report_details += '    <p class="font-monospace">    mean:&nbsp;' + str(pages_df_list_report_df['mean'].iloc[counter])[0:4] + '<br>    std:&nbsp;&nbsp;' + str(pages_df_list_report_df['std'].iloc[counter])[0:4] + '<br>    <br>    <!--min:&nbsp;&nbsp;' + str(pages_df_list_report_df['min'].iloc[counter])[0:4] + '<br>-->    25%:&nbsp;&nbsp;' + str(pages_df_list_report_df['25%'].iloc[counter])[0:4] + '<br>    50%:&nbsp;&nbsp;' + str(pages_df_list_report_df['50%'].iloc[counter])[0:4] + '<br>    75%:&nbsp;&nbsp;' + str(pages_df_list_report_df['75%'].iloc[counter])[0:4] + '<br>    <!--max:&nbsp;&nbsp;' + str(pages_df_list_report_df['max'].iloc[counter])[0:4] + '-->    </p>'
+    report_details += '    </div>'
+    report_details += '    </div>'
+    report_details += '    </div>'
     
 # close container if end of document
 report_details += '</div>'
