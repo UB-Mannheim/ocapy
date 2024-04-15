@@ -203,8 +203,7 @@ for alto_url in fulltext_path:
             textlines_wc.append(string_wc)
 
         # add textline to pages list
-        if textlines_wc:
-            pages_wc.append(textlines_wc)
+        pages_wc.append(textlines_wc)
     else:
         print('INFO: no textlines in ' + alto_filename)
 
