@@ -14,7 +14,7 @@
 
 # ## Preface
 #
-# We will handle a lot of data and might be limited be the I/O data rate limit. So start the notebook with the following command, as suggested here: https://stackoverflow.com/questions/43490495/how-to-set-notebookapp-iopub-data-rate-limit-and-others-notebookapp-settings-in
+# We will handle a lot of data and might be limited by the I/O data rate limit. So start the notebook with the following command, as suggested here: https://stackoverflow.com/questions/43490495/how-to-set-notebookapp-iopub-data-rate-limit-and-others-notebookapp-settings-in
 #
 # `jupyter notebook --NotebookApp.iopub_data_rate_limit=1e10`
 
@@ -102,7 +102,7 @@ else:
 # with small adjustments from myself
 def download_file(filename, url):
     """
-    Download an URL to a file
+    Download a URL to a file
     """
     with open(filename, 'wb') as fout:
         response = requests.get(url, stream=True)
@@ -116,12 +116,11 @@ def download_if_not_exists(filename, url):
     """
     Download a URL to a file if the file
     does not exist already.
-    Returns
-    -------
-    True if the file was downloaded,
-    False if it already existed
     """
-    if not os.path.exists(filename):
+    if os.path.exists(filename):
+        # give feedback if we are using a local copy
+        print("Using local copy: " + filename)
+    else:
         # create subfolders if necessary
         dirname = os.path.dirname(filename)
         if not os.path.exists(dirname):
@@ -130,11 +129,6 @@ def download_if_not_exists(filename, url):
         print("Retrieving: " + url, end="")
         download_file(filename, url)
         print(" -> Done!", end="\n")
-        # return True
-        return
-    # give feedback if we are using a local copy
-    print("Using local copy: " + filename)
-    # return False
 
 
 # ## Step 1 - File download
@@ -179,6 +173,16 @@ fulltext_path = []
 for item in filegrp_fulltext:
     fulltext_path.append(item['xlink:href'])
 
+# get all image location elements
+# get all image URLs from the xlink:href attribute
+image_url = []
+for use in ['PRESENTATION', 'MAX', 'DEFAULT']:
+    filegrp = mets_soup.find('mets:fileGrp', {"USE": use})
+    if filegrp:
+        filegrp_images = filegrp.find_all('mets:FLocat')
+        for item in filegrp_images:
+            image_url.append(item['xlink:href'])
+        break
 
 # ### ... download the ALTO files
 
@@ -568,11 +572,13 @@ for counter in range(len(fulltext_path)):
 
     # add card to row
     # each card is a detailed statistic for each page with the heatmap of each page
+    page = counter + 1
     report_details += '    <div class="col-lg-2 col-md-12 h-100">'
     report_details += '    <div class="card border-dark">'
-    report_details += '    <a href="alto/' + str(counter + 1).zfill(8) + '.xml"><img src="images/' + str(counter) + '.png" class="card-img-top" alt="Page ' + str(counter + 1) + '"></a>'
+    alto_url = 'alto/' + str(page).zfill(8) + '.xml'
+    report_details += '    <a href="' + alto_url + '"><img src="images/' + str(counter) + '.png" class="card-img-top" alt="Page ' + str(page) + '"></a>'
     report_details += '    <div class="card-body">'
-    report_details += '    <h5 class="card-title"><a href="https://pic.sub.uni-hamburg.de/kitodo/' + record_id + '/' + str(counter + 1).zfill(8) + '.tif" class="link-dark">Page ' + str(counter + 1) + '</a></h5>'
+    report_details += '    <h5 class="card-title"><a href="' + image_url[counter] + '" class="link-dark">Page ' + str(counter + 1) + '</a></h5>'
     report_details += '    <h6 class="card-subtitle mb-2 text-muted">Page Stats</h6>'
     report_details += '    <p class="font-monospace">    Words: ' + str(int(pages_df_list_report_df['count'].iloc[counter])) + '<br>    Lines: ' + str(len(pages_df_list[counter])) + '<br>    </p>'
     report_details += '    <h6 class="card-subtitle mb-2 text-muted">Word Confidence</h6>'
