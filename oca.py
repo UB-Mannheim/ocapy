@@ -62,35 +62,27 @@ from matplotlib.patches import Rectangle
 from PIL import Image
 
 parser = argparse.ArgumentParser(description='Visualize the word confidences of OCR results (ALTO-XML)')
-parser.add_argument('--mets-url', metavar='URL', help='URL of METS file')
-parser.add_argument('--purl', metavar='URL', help='PURL of digitized item')
+parser.add_argument('--mets-url', metavar='URL', help='URL of METS file (not required for SUB Hamburg)')
 parser.add_argument('--verbose', action=argparse.BooleanOptionalAction, metavar='URL', help='URL of METS file', required=False)
-parser.add_argument('ppn', metavar='PPN', help='PPN of digitized item, only works for SUB Hamburg', nargs='?')
+parser.add_argument('ppn', metavar='PPN', help='PPN of digitized item')
 args = parser.parse_args()
-
-# Don't use an interactive matplotlib backend even if DISPLAY is set.
-matplotlib.use('agg')
 
 if args.verbose:
     print(f'{args.mets_url=}')
     print(f'{args.ppn=}')
     print(f'{args.verbose=}')
     print(f'{matplotlib.get_backend()=}')
-    exit(0)
 
-if args.mets_url and args.ppn or not args.mets_url and not args.ppn:
-    # parser.print_help()
-    parser.print_usage()
-    print('oca.py: error: either PPN or --mets-url and --purl are required')
-    exit(1)
+# Don't use an interactive (and really slow) matplotlib backend.
+matplotlib.use('agg')
 
-if args.ppn:
-    record_id = args.ppn
-    mets_url = "https://mets.sub.uni-hamburg.de/kitodo/" + record_id
-    purl = "https://resolver.sub.uni-hamburg.de/kitodo/" + record_id
+if args.mets_url:
+    mets_url = args.mets_url
 else:
-    # mets_url = 'https://digi.bib.uni-mannheim.de/fileadmin/digi/' + record_id + '/' + record_id + '.xml'
-    pass
+    # derive METS URL from PPN for SUB Hamburg
+    mets_url = "https://mets.sub.uni-hamburg.de/kitodo/" + args.ppn
+
+record_id = args.ppn
 
 # ## Function definitions
 
@@ -165,6 +157,10 @@ with open(mets_filename, 'r', encoding='utf-8') as file:
 # cook a soup
 mets_soup = BeautifulSoup(mets, "lxml-xml")
 
+# get PURL
+purl = mets_soup.find('mods:identifier', {'type': 'purl'}).get_text()
+
+
 # get all file location elements
 filegrp_fulltext = mets_soup.find('mets:fileGrp', {"USE": "FULLTEXT"}).find_all('mets:FLocat')
 
@@ -238,7 +234,7 @@ for alto_url in fulltext_path:
         # loop through all strings
         for item in strings:
             # extract word confidencies for the strings
-            string_wc.append(item['WC'])
+            string_wc.append(item.get('WC', '1.0'))
         # add string to textline sublist
         textlines_wc.append(string_wc)
 
@@ -575,7 +571,7 @@ for counter in range(len(fulltext_path)):
     page = counter + 1
     report_details += '    <div class="col-lg-2 col-md-12 h-100">'
     report_details += '    <div class="card border-dark">'
-    alto_url = 'alto/' + str(page).zfill(8) + '.xml'
+    alto_url = 'alto/' + os.path.basename(fulltext_path[counter])
     report_details += '    <a href="' + alto_url + '"><img src="images/' + str(counter) + '.png" class="card-img-top" alt="Page ' + str(page) + '"></a>'
     report_details += '    <div class="card-body">'
     report_details += '    <h5 class="card-title"><a href="' + image_url[counter] + '" class="link-dark">Page ' + str(counter + 1) + '</a></h5>'
