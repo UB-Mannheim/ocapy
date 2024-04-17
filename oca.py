@@ -31,11 +31,11 @@
 
 
 # the test object(s)
-#record_id = "PPN1026788544" # about 50 pages, good ocr, low confidence
-#record_id = "PPN86268370X" # about 150 pages, good ocr, high confidence
-#record_id = "PPN1041860838" # about 350 pages, bad ocr -> wrong script, low confidence
-#record_id = "PPN1672846668" # about 100 pages, bad ocr -> wrong script, extreme high confidences, visible anomaly
-record_id = '1885328680'
+# record_id = "PPN1026788544" # about 50 pages, good ocr, low confidence
+# record_id = "PPN86268370X"  # about 150 pages, good ocr, high confidence
+# record_id = "PPN1041860838" # about 350 pages, bad ocr -> wrong script, low confidence
+# record_id = "PPN1672846668" # about 100 pages, bad ocr -> wrong script, extreme high confidences, visible anomaly
+
 
 # ## Importing libraries
 #
@@ -44,15 +44,53 @@ record_id = '1885328680'
 # In[2]:
 
 
+import argparse
 import os
+# we need a library, which allows copying files, once the temporary warming stripes for each textline are concatenated and final
+from shutil import copyfile
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import requests
+import seaborn as sns
 from bs4 import BeautifulSoup
 from matplotlib.collections import PatchCollection
 from matplotlib.patches import Rectangle
+# https://note.nkmk.me/en/python-pillow-concat-images/
+from PIL import Image
+
+parser = argparse.ArgumentParser(description='Visualize the word confidences of OCR results (ALTO-XML)')
+parser.add_argument('--mets-url', metavar='URL', help='URL of METS file')
+parser.add_argument('--purl', metavar='URL', help='PURL of digitized item')
+parser.add_argument('--verbose', action=argparse.BooleanOptionalAction, metavar='URL', help='URL of METS file', required=False)
+parser.add_argument('ppn', metavar='PPN', help='PPN of digitized item, only works for SUB Hamburg', nargs='?')
+args = parser.parse_args()
+
+# Don't use an interactive matplotlib backend even if DISPLAY is set.
+matplotlib.use('agg')
+
+if args.verbose:
+    print(f'{args.mets_url=}')
+    print(f'{args.ppn=}')
+    print(f'{args.verbose=}')
+    print(f'{matplotlib.get_backend()=}')
+    exit(0)
+
+if args.mets_url and args.ppn or not args.mets_url and not args.ppn:
+    # parser.print_help()
+    parser.print_usage()
+    print('oca.py: error: either PPN or --mets-url and --purl are required')
+    exit(1)
+
+if args.ppn:
+    record_id = args.ppn
+    mets_url = "https://mets.sub.uni-hamburg.de/kitodo/" + record_id
+    purl = "https://resolver.sub.uni-hamburg.de/kitodo/" + record_id
+else:
+    # mets_url = 'https://digi.bib.uni-mannheim.de/fileadmin/digi/' + record_id + '/' + record_id + '.xml'
+    pass
 
 # ## Function definitions
 
@@ -73,6 +111,7 @@ def download_file(filename, url):
         for block in response.iter_content(4096):
             fout.write(block)
 
+
 def download_if_not_exists(filename, url):
     """
     Download a URL to a file if the file
@@ -91,11 +130,11 @@ def download_if_not_exists(filename, url):
         print("Retrieving: " + url, end="")
         download_file(filename, url)
         print(" -> Done!", end="\n")
-        #return True
+        # return True
         return
     # give feedback if we are using a local copy
     print("Using local copy: " + filename)
-    #return False
+    # return False
 
 
 # ## Step 1 - File download
@@ -108,12 +147,12 @@ def download_if_not_exists(filename, url):
 
 
 # path to METS directory
-mets_dir = record_id + '/'
+mets_dir = record_id + "/mets/"
 
 # download the METS/MODS
 mets_filename = mets_dir + record_id + ".xml"
-mets_url = 'https://digi.bib.uni-mannheim.de/fileadmin/digi/' + mets_filename
 download_if_not_exists(mets_filename, mets_url)
+
 
 # ### ... extract the fulltext URLs
 #
@@ -125,15 +164,15 @@ download_if_not_exists(mets_filename, mets_url)
 
 
 # read the METS file
-mets=[]
+mets = []
 with open(mets_filename, 'r', encoding='utf-8') as file:
     mets = file.read()
 
 # cook a soup
-mets_soup = BeautifulSoup(mets,"lxml-xml")
+mets_soup = BeautifulSoup(mets, "lxml-xml")
 
 # get all file location elements
-filegrp_fulltext = mets_soup.find('mets:fileGrp', { "USE" : "FULLTEXT" }).find_all('mets:FLocat')
+filegrp_fulltext = mets_soup.find('mets:fileGrp', {"USE": "FULLTEXT"}).find_all('mets:FLocat')
 
 # get all fulltext URLs from the xlink:href attribute
 fulltext_path = []
@@ -170,42 +209,37 @@ pages_wc = []
 # loop through all ALTO files
 for alto_url in fulltext_path:
     # read the ALTO file
-    alto=[]
+    alto = []
     alto_filename = alto_dir + os.path.basename(alto_url)
     with open(alto_filename, 'r', encoding='utf-8') as file:
         alto = file.read()
 
     # cook a soup
-    alto_soup = BeautifulSoup(alto,"lxml-xml")
+    alto_soup = BeautifulSoup(alto, "lxml-xml")
 
     # extract all textlines
     textlines = alto_soup.find_all('TextLine')
-    if textlines:
-        print('INFO: textlines in ' + alto_filename)
-        print(textlines)
 
-        # create sublist for textlines
-        textlines_wc = []
+    # create sublist for textlines
+    textlines_wc = []
 
-        # loop through all textlines
-        for item in textlines:
-            # extract al strings
-            strings = item.find_all('String')
+    # loop through all textlines
+    for item in textlines:
+        # extract al strings
+        strings = item.find_all('String')
 
-            # create sublist for strings
-            string_wc = []
+        # create sublist for strings
+        string_wc = []
 
-            # loop through all strings
-            for item in strings:
-                # extract word confidencies for the strings
-                string_wc.append(item['WC'])
-            # add string to textline sublist
-            textlines_wc.append(string_wc)
+        # loop through all strings
+        for item in strings:
+            # extract word confidencies for the strings
+            string_wc.append(item['WC'])
+        # add string to textline sublist
+        textlines_wc.append(string_wc)
 
-        # add textline to pages list
-        pages_wc.append(textlines_wc)
-    else:
-        print('INFO: no textlines in ' + alto_filename)
+    # add textline to pages list
+    pages_wc.append(textlines_wc)
 
 
 # ### ... create a list of DataFrames for all pages
@@ -214,9 +248,6 @@ for alto_url in fulltext_path:
 
 # In[ ]:
 
-
-print('INFO: pages_wc')
-print(pages_wc)
 
 # create list of DataFrames
 pages_df_list = [pd.DataFrame(item) for item in pages_wc]
@@ -244,7 +275,7 @@ for index, item in enumerate(pages_df_list):
 # a look at page 9 with five digits after the decimal point
 # equals three digits after the decimal point for percentages
 # remember: this is just a display property!
-pd.set_option('display.precision',5)
+pd.set_option('display.precision', 5)
 pages_df_list[8]
 
 
@@ -319,7 +350,7 @@ if not os.path.exists(temp_dir):
     os.makedirs(temp_dir)
 
 
-#last_item = pages_df_list[8].iloc[3].dropna().shape[0]
+# last_item = pages_df_list[8].iloc[3].dropna().shape[0]
 
 # how many pages have actually values to work with => skip empty pages
 last_item = pages_df_list_report_df['mean'].dropna().shape[0]
@@ -344,10 +375,10 @@ col.set_array(pages_df_list_report_df['mean'].dropna())
 col.set_cmap("brg")
 
 # set limits, plot collection and save figure
-col.set_clim(0.0,1.0)
+col.set_clim(0.0, 1.0)
 ax.add_collection(col)
 ax.set_ylim(0, 1)
-ax.set_xlim(0, last_item +1)
+ax.set_xlim(0, last_item + 1)
 fig.savefig(images_dir + record_id + '.png')
 
 
@@ -357,10 +388,6 @@ fig.savefig(images_dir + record_id + '.png')
 # In this form we can only concatenate two images into one, which means, that for multiple textlines we would concatenate each new line to the compound image, that we priorly created.
 
 # In[ ]:
-
-
-#https://note.nkmk.me/en/python-pillow-concat-images/
-from PIL import Image
 
 
 def get_concat_v(im1, im2):
@@ -375,13 +402,10 @@ def get_concat_v(im1, im2):
 # In[ ]:
 
 
-# we need a library, which allows copying files, once the temporary warming stripes for each textline are concatenated and final
-from shutil import copyfile
-
 # now lets create the "heatmap" for each page in our list of DataFrames
 for page_index, page in enumerate(pages_df_list):
     # of course with each textline as separate warming stripes
-    for textline_index in range(0,(page.shape[0])):
+    for textline_index in range(0, (page.shape[0])):
         # print progress
         print("Page " + str(page_index) + " Line " + str(textline_index))
 
@@ -405,8 +429,7 @@ for page_index, page in enumerate(pages_df_list):
         ax.add_collection(col)
 
         ax.set_ylim(0, 1)
-        ax.set_xlim(0, last_item +1)
-
+        ax.set_xlim(0, last_item + 1)
 
         # if it's the first textline, simply store it
         if textline_index == 0:
@@ -435,7 +458,6 @@ for page_index, page in enumerate(pages_df_list):
         os.rename(temp_dir + str(page_index) + '.png', images_dir + str(page_index) + '.png')
 
 
-
 # ### ...now resize all images to an equal width and height
 # There will be pages with few and with very much textlines. For a cleaner look, we will resize all output images to a DIN A7 format at screen resolution, with exception of the general statistic, which will be in DIN A5.
 
@@ -446,13 +468,13 @@ for filename in os.listdir(images_dir):
     # open the file
     with Image.open(images_dir + filename) as img:
         # resize it to the following width and height
-        (width, height) = (210, 298) # DIN A7 at screen resolution (72dpi)
+        (width, height) = (210, 298)  # DIN A7 at screen resolution (72dpi)
         img.resize((width, height), resample=Image.BOX).save(images_dir + filename)
 
 # do it again for the general statistic
 with Image.open(images_dir + record_id + '.png') as img:
-        (width, height) = (420, 595) # DIN A5 at screen resolution (72dpi)
-        img.resize((width, height), resample=Image.BOX).save(images_dir + record_id + '.png')
+    (width, height) = (420, 595)  # DIN A5 at screen resolution (72dpi)
+    img.resize((width, height), resample=Image.BOX).save(images_dir + record_id + '.png')
 
 
 # ### ...we might want to know the confidence distribution as well
@@ -468,9 +490,8 @@ confidence_df.drop('level_1', axis=1, inplace=True)
 confidence_df
 
 # and print and save a distribution plot
-import seaborn as sns
 
-#sns.set_theme(style="whitegrid")
+# sns.set_theme(style="whitegrid")
 g = sns.displot(
     confidence_df, x="Confidence", kde=True
 )
@@ -496,13 +517,19 @@ mods_year = mets_soup.find('mods:dateIssued').string if mets_soup.find('mods:dat
 report_filename = record_id + "/" + record_id + "_report.html"
 
 # header and opening the HTML body
-report_start = '<!doctype html><html lang="en"><head><meta charset="utf-8">                <meta name="viewport" content="width=device-width, initial-scale=1">                <title>OCA.py Report - ' + record_id + '</title>                <link href="../ocapy/bootstrap.min.css" rel="stylesheet"></head>                <body><script src="../ocapy/bootstrap.bundle.min.js"></script>'
+report_start = '<!doctype html>'
+report_start += '<html lang="en">'
+report_start += '<head><meta charset="utf-8">'
+report_start += '                <meta name="viewport" content="width=device-width, initial-scale=1">                <title>OCA.py Report - ' + record_id + '</title>                <link href="../ocapy/bootstrap.min.css" rel="stylesheet"></head>                <body><script src="../ocapy/bootstrap.bundle.min.js"></script>'
 
 # closing the HTML body
 report_end = '</body></html>'
 
 # the overview shows the contents of the general statistic and some descriptive metadata
-report_overview = '<div class="container"><h1><a href="https://resolver.sub.uni-hamburg.de/kitodo/' + record_id + '" class="link-dark">Result for ' + record_id + '</a></h1></div><div class="container"><div class="row gx-2 m-1"><div class="col-lg-12 col-md-12 h-100"><div class="card mb-3">  <div class="row g-0">    <div class="col-md-4">      <a href="https://mets.sub.uni-hamburg.de/kitodo/' + record_id + '"><img src="images/' + record_id + '.png" class="img-fluid rounded-start" alt="..."></a>    </div>    <div class="col-md-8">      <div class="card-body">        <h5 class="card-title">' + mods_author + ' (' + mods_year + '): <em>' + mods_title + '</em></h5><br>        <h6 class="card-subtitle mb-2 text-muted">Page Stats</h6>    <p class="font-monospace">    Total Pages: ' + str(int(pages_df_list_report_df.shape[0])) + '<br>    Total Words: ' + str(int(pages_df_list_report_df['count'].sum())) + '<br>    Total Lines: ' + str(int(pages_df_list_report_df['textlines'].sum())) + '<br>    </p>    <h6 class="card-subtitle mb-2 text-muted">Word Confidence</h6>    <p class="font-monospace">    &#8709;&nbsp;mean:&nbsp;' + str(pages_df_list_report_df['mean'].mean())[0:4] + '<br>\
+report_overview = '<div class="container">'
+report_overview += '<h1><a href="' + purl + '" class="link-dark">Result for ' + record_id + '</a></h1>'
+report_overview += '</div>'
+report_overview += '<div class="container"><div class="row gx-2 m-1"><div class="col-lg-12 col-md-12 h-100"><div class="card mb-3">  <div class="row g-0">    <div class="col-md-4">      <a href="' + mets_url + '"><img src="images/' + record_id + '.png" class="img-fluid rounded-start" alt="..."></a>    </div>    <div class="col-md-8">      <div class="card-body">        <h5 class="card-title">' + mods_author + ' (' + mods_year + '): <em>' + mods_title + '</em></h5><br>        <h6 class="card-subtitle mb-2 text-muted">Page Stats</h6>    <p class="font-monospace">    Total Pages: ' + str(int(pages_df_list_report_df.shape[0])) + '<br>    Total Words: ' + str(int(pages_df_list_report_df['count'].sum())) + '<br>    Total Lines: ' + str(int(pages_df_list_report_df['textlines'].sum())) + '<br>    </p>    <h6 class="card-subtitle mb-2 text-muted">Word Confidence</h6>    <p class="font-monospace">    &#8709;&nbsp;mean:&nbsp;' + str(pages_df_list_report_df['mean'].mean())[0:4] + '<br>\
     &#8709;&nbsp;std:&nbsp;&nbsp;' + str(pages_df_list_report_df['std'].mean())[0:4] + '<br>\
     <br>\
     &#8709;&nbsp;25%:&nbsp;&nbsp;' + str(pages_df_list_report_df['25%'].mean())[0:4] + '<br>\
@@ -533,10 +560,11 @@ for counter in range(len(fulltext_path)):
     if counter % 6 == 0:
         report_details += '<div class="row gx-2 m-1"></div><div class="row gx-2 m-1">'
 
-    print(f'{counter=}')
-    print(f'{pages_df_list_report_df["count"]=}')
-    print(f'{pages_df_list_report_df["count"].iloc[counter]}')
-    print(f'{pages_df_list_report_df["count"].iloc=}')
+    if args.verbose:
+        print(f'{counter=}')
+        print(f'{pages_df_list_report_df["count"]=}')
+        print(f'{pages_df_list_report_df["count"].iloc[counter]}')
+        print(f'{pages_df_list_report_df["count"].iloc=}')
 
     # add card to row
     # each card is a detailed statistic for each page with the heatmap of each page
@@ -560,7 +588,7 @@ report_details += '</div>'
 report = report_start + report_overview + report_details + report_end
 
 # cook a soup (we need an XML object from the string provided)
-report_soup = BeautifulSoup(report)
+report_soup = BeautifulSoup(report, features='html5lib')
 # prettify the HTML, so it won't look nasty
 report_pretty = str(report_soup.prettify()).encode(encoding='UTF-8')
 
